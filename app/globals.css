@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities; 
+
+
+:root {
+  --neon: #00C2FF;
+  --neon-dim: rgba(0, 194, 255, 0.12);
+  --neon-glow: rgba(0, 194, 255, 0.4);
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --muted: rgba(232, 244, 255, 0.45);
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl;
+  }
+  .neon-text {
+    color: var(--neon);
+  }
+  .font-mono-custom {
+    font-family: var(--font-mono);
+  }
+  .font-display {
+    font-family: var(--font-syne);
+  }
+  .neon-border {
+    @apply border border-[#00C2FF]/20 hover:border-[#00C2FF]/40 transition-colors;
+  }
+}
+
+/* Grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 194, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 194, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
+/* Wallet adapter modal override */
+.wallet-adapter-modal-wrapper {
+  background: #090912 !important;
+  border: 0.5px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+}
+.wallet-adapter-button-trigger {
+  background: transparent !important;
+  border: 1px solid var(--neon) !important;
+  color: var(--neon) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  transition: box-shadow 0.25s !important;
+}
+.wallet-adapter-button-trigger:hover {
+  background: var(--neon-dim) !important;
+  box-shadow: 0 0 20px var(--neon-glow) !important;
+} 

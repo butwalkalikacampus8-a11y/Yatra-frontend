@@ -1,37 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏔️ Drishti — Fiscal Transparency Portal
+### Government of Nepal · On-Chain Public Expenditure Dashboard
+
+---
+
+## Architecture Overview
+
+```
+app/
+  layout.tsx              ← Root Server Component (no "use client")
+  globals.css             ← Design system tokens + all component CSS
+  dashboard/
+    page.tsx              ← Server Component — thin shell, exports metadata
+
+components/dashboard/
+  DrishtiDashboard.tsx    ← Client Component — page orchestrator + Framer Motion
+  VaultBackground.tsx     ← Client Component — Spline 3D scene (NEVER import directly)
+  TransactionTable.tsx    ← Client Component — live-polling table with AnimatePresence
+  KpiStrip.tsx            ← Client Component — 4 animated KPI cards
+  TopNav.tsx              ← Client Component — sticky top bar
+  SideNav.tsx             ← Client Component — vertical icon nav
+
+lib/
+  transactions.ts         ← Types, mock data generator, formatters
+```
+
+---
+
+## Critical Technical Decisions
+
+### 1. Hydration-Safe 3D Integration
+
+The Spline WebGL runtime accesses `window`, `document`, and `WebGLRenderingContext`
+which do not exist in Node.js. Importing `VaultBackground` directly would cause:
+
+```
+Error: document is not defined
+ReferenceError: WebGLRenderingContext is not defined
+```
+
+**Solution** — always import via `dynamic` with `ssr: false`:
+
+```ts
+// ✅ Correct — in DrishtiDashboard.tsx
+const VaultBackground = dynamic(() => import("./VaultBackground"), { ssr: false });
+
+// ❌ Wrong — direct import would break SSR
+import VaultBackground from "./VaultBackground";
+```
+
+### 2. No Async Client Components
+
+Next.js 15 prohibits `async` Client Components. All data fetching uses `useEffect`:
+
+```ts
+// ✅ Correct
+"use client";
+export default function TransactionTable() {
+  const [txs, setTxs] = useState([]);
+  useEffect(() => { /* fetch here */ }, []);
+  return <table>...</table>;
+}
+
+// ❌ Wrong
+"use client";
+export default async function TransactionTable() { /* not allowed */ }
+```
+
+### 3. ESM Transpilation for Spline
+
+`@splinetool/react-spline` ships as ESM-only. Without the `transpilePackages`
+directive in `next.config.ts`, Next.js 15 throws a `SyntaxError: Cannot use
+import statement` during the server build phase.
+
+```ts
+// next.config.ts
+transpilePackages: ["@splinetool/react-spline", "@splinetool/runtime"]
+```
+
+---
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Install dependencies
+pnpm install
+
+# Run development server (Turbopack)
 pnpm dev
-# or
-bun dev
+
+# Open http://localhost:3000/dashboard
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Connecting Your Spline Scene
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a vault / safe-door scene at [spline.design](https://spline.design)
+2. Export → "Spline Viewer" → copy the `.splinecode` URL
+3. Replace `SPLINE_SCENE_URL` in `components/dashboard/VaultBackground.tsx`
 
-## Learn More
+Recommended scene settings for the "war room" aesthetic:
+- Background: transparent (the CSS void colour shows through)
+- Lighting: single warm-amber point light, subtle ambient
+- Animation: continuous slow rotation on the Y axis
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Connecting to Solana / Anchor
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Replace the mock data in `TransactionTable.tsx`'s `useEffect` with:
 
-## Deploy on Vercel
+```ts
+import { Connection, PublicKey } from "@solana/web3.js";
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+const connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# drishti-frontend
+useEffect(() => {
+  const programId = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID!);
+
+  // Subscribe to program account changes
+  const subId = connection.onProgramAccountChange(programId, (info) => {
+    // Parse your Anchor account data here
+    const tx = parseAnchorTransaction(info.accountInfo.data);
+    setTxs(prev => [tx, ...prev].slice(0, MAX_ROWS));
+  });
+
+  return () => { connection.removeProgramAccountChangeListener(subId); };
+}, []);
+```
+
+---
+
+## Design System
+
+| Token          | Value                    | Usage              |
+|----------------|--------------------------|--------------------|
+| `--amber`      | `#f59e0b`                | Primary accent     |
+| `--emerald`    | `#34d399`                | Confirmed/success  |
+| `--sky`        | `#60a5fa`                | Links, info        |
+| `--rose`       | `#f87171`                | Errors, warnings   |
+| `--bg-surface` | `rgba(12,14,20,0.72)`    | Glass panels       |
+| `--blur-glass` | `blur(18px) saturate(160%)` | Backdrop filter |
+| Font Display   | Syne (800)               | Headings           |
+| Font Mono      | JetBrains Mono           | Data, code, badges |
+
+---
+
+## Roadmap
+
+- [ ] Real-time Solana WebSocket subscription
+- [ ] Ministry-level drill-down pages
+- [ ] Audit trail export (PDF / CSV)
+- [ ] Nepali language (Devanagari) toggle
+- [ ] Dark / High-contrast accessibility mode
+- [ ] Solana wallet adapter integration (Phantom, Backpack)
